@@ -20,7 +20,7 @@ The final products provide the user with the ability to:
 - Libraries: numpy, matplotlib.pyplot, json, os, random, collections, PIL, argparse
 - Jupyter Notebooks
 
-# Key Findings
+## Key Findings
 - Adam optimizer was much faster at the initial training than RMSprop
 - Adagrad optimizer was slower than both the above
 - Models benefited from reduced learning rates as they neared higher levels of accuracy to continue learning
