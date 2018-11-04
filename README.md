@@ -2,7 +2,7 @@
 This project was completed as part of the course requirements of Udacity's [Data Scientist Nanodegree](https://www.udacity.com/course/data-scientist-nanodegree--nd025) certification.
 
 ## Overview
-The project used transfer learning to train pre-trained ImageNet neural networks to identify 102 flower types from [this dataset](http://www.robots.ox.ac.uk/~vgg/data/flowers/102/index.html). An exploration was conducted into a notebook and then converted to executable scripts with the use or argparse to provide execution options.
+The project used transfer learning to train pre-trained ImageNet neural networks to identify 102 flower types from [this dataset](http://www.robots.ox.ac.uk/~vgg/data/flowers/102/index.html). An exploration was conducted in a notebook and then converted to executable scripts with the use or argparse to provide execution options.
 
 The final products provide the user with the ability to: 
 1. Specify the architecture of a classifier (with relu activation and dropout = 0.5 for hidden layers)
