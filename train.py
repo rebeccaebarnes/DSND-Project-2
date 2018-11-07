@@ -13,19 +13,23 @@ import load
 parser = argparse.ArgumentParser(description="Train a model to recognize 102 flower types")
 parser.add_argument("data_dir", help="Main directory for image set")
 parser.add_argument("-s", "--save_dir", help="Location for saving model checkpoint")
-parser.add_argument("-a", "--arch", 
+parser.add_argument("-a", "--arch",
                     choices=["vgg11", "vgg11_bn", "vgg13", "vgg13_bn",
                              "vgg16", "vgg16_bn", "vgg19", "vgg19_bn",
                              "densenet121", "densenet161", "densenet169", "densenet201"],
                     default="vgg19_bn", help="Pre-trained model type")
-group = parser.add_argument_group('hyperparameters')
-group.add_argument("-l", "--learning_rate", type=float, default=0.001, help="Learning rate")
-group.add_argument("-u", "--hidden_units", nargs="+", type=int, default=[512, 256],
+hyper = parser.add_argument_group('hyperparameters')
+hyper.add_argument("-l", "--learning_rate", type=float, default=0.001, help="Learning rate")
+hyper.add_argument("-u", "--hidden_units", nargs="+", type=int, default=[512, 256],
                     help="Number of nodes per hidden layer")
-group.add_argument("-e", "--epochs", type=int, default=20, help="Number of training epochs")
+hyper.add_argument("-e", "--epochs", type=int, default=20, help="Number of training epochs")
 parser.add_argument("-g", "--gpu", action="store_true", help="Use GPU for training")
-parser.add_argument("-r", "--random_search", action="store_true",
+randomize = parser.add_mutually_exclusive_group()
+randomize.add_argument("-r", "--random_search", action="store_true",
                     help="Conduct a random search of optimizer, epochs, and learning rate")
+randomize.add_argument("--full_search", action="store_true",
+                       help="Conduct a random search of hidden layer architecture, optimizer," \
+                            "epochs, and learning rate")
 parser.add_argument("-n", "--n_iter", type=int, default=5,
                     help="Number of model iterations for random search")
 args = parser.parse_args()
@@ -37,24 +41,24 @@ def create_model(arch_name):
     return model
 
 def update_classifier(model, hidden_layers):
-    '''Updates the classifier of an existing model with a relu/dropout model with 
+    '''Updates the classifier of an existing model with a relu/dropout model with
        the specified hidden layers.'''
     # Freeze parameters to avoid training
     for param in model.parameters():
         param.requires_grad = False
-    
+
     # Get input_size and output sizes
     input_size = model.classifier[0].in_features
     output_size = 102
 
     # Create classifier and replace pre-trained classifier
-    classifier = load.Network(input_size=input_size, output_size=output_size, 
+    classifier = load.Network(input_size=input_size, output_size=output_size,
                               hidden_layers=hidden_layers)
     model.classifier = classifier
 
-def set_hyperparams(model, randomize=True, optimizer_name='Adam', 
+def set_hyperparams(model, randomize=True, optimizer_name='Adam',
                     learnrate=0.0001, epochs=15, gpu=True):
-    '''Creates optimizer, learnrate and epoch hyperparameters, with the 
+    '''Creates optimizer, learnrate and epoch hyperparameters, with the
        option to randomize instead of manually providing inputs.'''
     # Move model to GPU if selected and available
     device = torch.device("cpu")
@@ -74,14 +78,14 @@ def set_hyperparams(model, randomize=True, optimizer_name='Adam',
     else:
         optimizer = getattr(optim, optimizer_name)
         optimizer = optimizer(model.classifier.parameters(), lr=learnrate)
-    
+
     return optimizer, epochs
 
 def validation(model, testloader, criterion, gpu):
     '''Evaluates model accuracy on a dataset, returns test_loss and accuracy.'''
     test_loss = 0
     accuracy = 0
-    
+
     device = torch.device("cpu")
     if gpu:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -90,7 +94,7 @@ def validation(model, testloader, criterion, gpu):
         images, labels = images.to(device), labels.to(device)
         output = model.forward(images)
         test_loss += criterion(output, labels).item()
-        
+
         # Convert back to softmax distribution
         ps = torch.exp(output)
         # Compare highest prob predicted class ps.max(dim=1)[1] with labels
@@ -98,25 +102,25 @@ def validation(model, testloader, criterion, gpu):
         # Convert to cpu and type FloatTensor for mean
         equality.cpu()
         accuracy += equality.type(torch.FloatTensor).mean()
-    
+
     return test_loss, accuracy
 
-def model_train(model, trainloader, validloader, 
+def model_train(model, trainloader, validloader,
                 optimizer, epochs, gpu=True):
-    '''Trains a model on a dataset, printing incremental gains for training and 
+    '''Trains a model on a dataset, printing incremental gains for training and
        validation data, returns last captured train_loss, valid_loss, valid_accuracy.'''
     # Create variables for printing
     steps = 0
     running_loss = 0
     print_every = 20 # Set to 20 to minimize difference in loss collected for metrics
-    
+
     # Conditional GPU activation
     device = torch.device("cpu")
     if gpu:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         print("Using GPU?", torch.cuda.is_available())
     model.to(device)
-    
+
     # Set criterion
     criterion = nn.NLLLoss()
 
@@ -133,28 +137,28 @@ def model_train(model, trainloader, validloader,
         for images, labels in trainloader:
             images, labels = images.to(device), labels.to(device)
             steps += 1
-            
+
             # Zero out gradients for each epoch
             optimizer.zero_grad()
-            
+
             output = model.forward(images) # Feedforward through model
             loss = criterion(output, labels) # Calculate loss
             loss.backward() # Feed loss back through model
             optimizer.step() # Adjust weights
-            
+
             running_loss += loss.item()
-            
+
             # Print testing details
             if steps % print_every == 0:
                 # Put in eval mode
                 model.eval()
                 model.to(device)
-                
+
                 # Turn off gradients
                 with torch.no_grad():
-                    test_loss, accuracy = validation(model, validloader, 
+                    test_loss, accuracy = validation(model, validloader,
                                                      criterion, gpu)
-                
+
                 train_loss = running_loss/print_every
                 valid_loss = test_loss/len(validloader)
                 valid_accuracy = accuracy/len(validloader)
@@ -162,13 +166,13 @@ def model_train(model, trainloader, validloader,
                   "Training Loss: {:.3f}.. ".format(train_loss),
                   "Valid. Loss: {:.3f}.. ".format(valid_loss),
                   "Valid. Accuracy: {:.3f}".format(valid_accuracy))
-            
+
             # Reset running_loss
             running_loss = 0
-            
+
             # Make sure training is back on
             model.train()
-    
+
     # Return last run of metrics for later use
     return train_loss, valid_loss, valid_accuracy.item()
 
@@ -181,11 +185,11 @@ def save_model(model, arch, optimizer, epochs, trainimages,
     # Create directory
     if not os.path.exists(save_location):
         os.makedirs(save_location)
-    
+
     # Count number of files in dir - accurate count based on dedicated save folder
     files_in_folder = len([name for name in os.listdir(save_location) \
                            if os.path.isfile(name)])
-    
+
     # Map classes to idx
     model.class_to_idx = trainimages.class_to_idx
 
@@ -213,10 +217,16 @@ def save_model(model, arch, optimizer, epochs, trainimages,
                 str(files_in_folder) + '.pth'
     torch.save(params, os.path.join(save_location, file_name))
 
-def random_search(model, arch, n_iter, trainloader, validloader, trainimages, 
-                  save_location, gpu):
-    '''Conducts a random search of optimizer, learnrate, and epochs and saves
-       model parameters.'''
+def randomize_hidden_layers():
+    first_layer = random.randint(500, 4500)
+    second_layer = random.randint(50, 300)
+    return [first_layer, second_layer]
+
+def random_search(arch, hidden_layers, n_iter, trainloader, validloader, trainimages,
+                  save_location, gpu, full_search=None):
+    '''Conducts a random search of model arch and hyperparameters with the option
+       to only search hyperparameters.'''
+
     # Count number of files in dir - accurate count based on dedicated save folder
     files_in_folder = len([name for name in os.listdir(save_location) \
                            if os.path.isfile(name)])
@@ -225,46 +235,56 @@ def random_search(model, arch, n_iter, trainloader, validloader, trainimages,
     for i in range(n_iter):
         # Manage 'GPU in use' RuntimeErrors
         try:
+            # Create model
             print('\nTest No.', i + files_in_folder)
+            model = create_model(arch)
+            if full_search:
+                hidden_layers = randomize_hidden_layers()
+            else:
+                hidden_layers = hidden_layers
+            update_classifier(model, hidden_layers)
+
             # Randomize hyperparams
             optimizer, epochs = set_hyperparams(model, gpu=gpu)
-            
+
             # Train model
             train_loss, valid_loss, valid_accuracy = model_train(
                 model, trainloader, validloader, optimizer, epochs, gpu)
             # Save model
             save_model(model, arch, optimizer, epochs, trainimages,
                        train_loss, valid_loss, valid_accuracy, save_location)
-        
+
         except RuntimeError as e:
             print(e, '\n Moving to next model.')
             continue
 
-
 if __name__ == "__main__":
-    # Set up model and import data
-    model = create_model(args.arch)
-    update_classifier(model, args.hidden_units)
+    # Set up loader objects
     data_transforms = load.data_transforms()
     image_datasets = load.image_datasets(args.data_dir, data_transforms)
     data_loaders = load.data_loaders(image_datasets)
 
-    if args.random_search:
-        random_search(model, arch=args.arch, n_iter=args.n_iter, 
-                      trainloader=data_loaders.train, validloader=data_loaders.valid, 
-                      trainimages=image_datasets.train, save_location=args.save_dir, 
-                      gpu=args.gpu)
-                      
+    # Run random or specified model
+    if (args.full_search | args.random_search):
+        random_search(arch=args.arch, hidden_layers=args.hidden_units,
+                      n_iter=args.n_iter, trainloader=data_loaders.train,
+                      validloader=data_loaders.valid,
+                      trainimages=image_datasets.train,
+                      save_location=args.save_dir, gpu=args.gpu,
+                      full_search=args.full_search)
     else:
+        model = create_model(args.arch)
+        update_classifier(model, args.hidden_units)
+
         optimizer, epochs = set_hyperparams(
-            model, randomize=False, learnrate=args.learning_rate, 
+            model, randomize=False, learnrate=args.learning_rate,
             epochs=args.epochs, gpu=args.gpu)
 
         train_loss, valid_loss, valid_accuracy = model_train(
-            model, trainloader=data_loaders.train, validloader=data_loaders.valid, 
+            model, trainloader=data_loaders.train, validloader=data_loaders.valid,
             optimizer=optimizer, epochs=epochs, gpu=args.gpu)
-            
-        save_model(model, arch=args.arch, optimizer=optimizer, epochs=epochs, 
-                   train_loss=train_loss,valid_loss=valid_loss, 
-                   valid_accuracy=valid_accuracy, trainimages=image_datasets.train, 
+
+        save_model(model, arch=args.arch, optimizer=optimizer, epochs=epochs,
+                   train_loss=train_loss,valid_loss=valid_loss,
+                   valid_accuracy=valid_accuracy, trainimages=image_datasets.train,
                    save_location=args.save_dir)
