@@ -17,7 +17,7 @@ parser.add_argument("-a", "--arch",
                     choices=["vgg11", "vgg11_bn", "vgg13", "vgg13_bn",
                              "vgg16", "vgg16_bn", "vgg19", "vgg19_bn",
                              "densenet121", "densenet161", "densenet169", "densenet201"],
-                    default="vgg19_bn", help="Pre-trained model type")
+                    default=None, help="Pre-trained model type")
 hyper = parser.add_argument_group('hyperparameters')
 hyper.add_argument("-l", "--learning_rate", type=float, default=0.001, help="Learning rate")
 hyper.add_argument("-u", "--hidden_units", nargs="+", type=int, default=[512, 256],
@@ -224,6 +224,13 @@ def randomize_hidden_layers():
     second_layer = random.randint(50, 300)
     return [first_layer, second_layer]
 
+def randomize_arch():
+    potential_arch = ["vgg11", "vgg11_bn", "vgg13", "vgg13_bn",
+                      "vgg16", "vgg16_bn", "vgg19", "vgg19_bn",
+                      "densenet121", "densenet161", "densenet169", "densenet201"]
+
+    return random.choice(potential_arch)
+  
 def random_search(arch, hidden_layers, n_iter, trainloader, validloader, trainimages,
                   save_location, gpu, full_search=None):
     '''Conducts a random search of model arch and hyperparameters with the option
@@ -231,8 +238,11 @@ def random_search(arch, hidden_layers, n_iter, trainloader, validloader, trainim
 
     # Count number of files in dir - accurate count based on dedicated save folder
     files_in_folder = len([name for name in os.listdir(save_location) \
-                           if os.path.isfile(name)])
-
+                           if name.endswith('.pth')])
+    
+    if not arch:
+        arch = randomize_arch()
+    
     # Run n_iter number of tests
     for i in range(n_iter):
         # Manage 'GPU in use' RuntimeErrors
