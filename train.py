@@ -15,8 +15,7 @@ parser.add_argument("data_dir", help="Main directory for image set")
 parser.add_argument("-s", "--save_dir", help="Location for saving model checkpoint")
 parser.add_argument("-a", "--arch",
                     choices=["vgg11", "vgg11_bn", "vgg13", "vgg13_bn",
-                             "vgg16", "vgg16_bn", "vgg19", "vgg19_bn",
-                             "densenet121", "densenet161", "densenet169", "densenet201"],
+                             "vgg16", "vgg16_bn", "vgg19", "vgg19_bn"],
                     default=None, help="Pre-trained model type")
 hyper = parser.add_argument_group('hyperparameters')
 hyper.add_argument("-l", "--learning_rate", type=float, default=0.001, help="Learning rate")
@@ -226,8 +225,7 @@ def randomize_hidden_layers():
 
 def randomize_arch():
     potential_arch = ["vgg11", "vgg11_bn", "vgg13", "vgg13_bn",
-                      "vgg16", "vgg16_bn", "vgg19", "vgg19_bn",
-                      "densenet121", "densenet161", "densenet169", "densenet201"]
+                      "vgg16", "vgg16_bn", "vgg19", "vgg19_bn"]
 
     return random.choice(potential_arch)
   
