@@ -3,8 +3,8 @@ import os
 import random
 
 import torch
-from torch import nn
-from torch import optim
+from torch import nn, optim
+from torch.optim import lr_scheduler
 from torchvision import models
 
 import load
@@ -121,8 +121,9 @@ def model_train(model, trainloader, validloader,
         print("Using GPU?", torch.cuda.is_available())
     model.to(device)
 
-    # Set criterion
+    # Set criterion and scheduler
     criterion = nn.NLLLoss()
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=5, gamma=.1)
 
     # Display model hyperparameters
     learnrate = optimizer.state_dict()['param_groups'][0]['lr']
@@ -133,6 +134,7 @@ def model_train(model, trainloader, validloader,
 
     # Run training
     for e in range(epochs):
+        scheduler.step()
         model.train() # Set to training mode 'just in case'
         for images, labels in trainloader:
             images, labels = images.to(device), labels.to(device)
