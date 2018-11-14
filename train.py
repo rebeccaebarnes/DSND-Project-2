@@ -66,7 +66,7 @@ def set_hyperparams(model, randomize=True, optimizer_name='Adam',
     model.to(device)
 
     # List of optimizer names
-    optimizer_names = ['Adam', 'Adagrad', 'RMSprop']
+    optimizer_names = ['Adam', 'Adagrad', 'RMSprop', 'Adamax']
 
     # Create randomization of parameters
     if randomize:
